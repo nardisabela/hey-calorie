@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contador de Calorias</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <!-- Adicione o SheetJS aqui -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🍎 CalorieCounter</h1>
+      <p>Seu ajudante fofo para uma vida saudável!</p>
+      <button id="themeToggle"><i class="fas fa-moon"></i> Tema Escuro</button>
+    </header>
+
+    <!-- Seção de Alimentos -->
+    <div class="section">
+      <h2><i class="fas fa-utensils"></i> Calorias Consumidas</h2>
+      <input type="text" id="foodInput" placeholder="Ex: frango grelhado">
+      <input type="number" id="foodQuantity" placeholder="Quantidade (em gramas)">
+      <button id="foodButton"><i class="fas fa-calculator"></i> Calcular Calorias</button>
+      <p id="foodResult"></p>
+      <p id="lipidiosResult"></p>
+      <p id="proteinasResult"></p>
+      <p id="carboidratosResult"></p>
+    </div>
+
+    <!-- Seção de Exercícios -->
+    <div class="section">
+      <h2><i class="fas fa-running"></i> Calorias Gastas</h2>
+      <input type="text" id="exerciseInput" placeholder="Ex: corrida">
+      <input type="number" id="exerciseDuration" placeholder="Duração (em minutos)">
+      <button id="exerciseButton"><i class="fas fa-calculator"></i> Calcular Calorias Gastas</button>
+      <p id="exerciseResult"></p>
+    </div>
+
+    <footer>
+      <p>Feito com ❤️ por você!</p>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

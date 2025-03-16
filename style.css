@@ -1,0 +1,178 @@
+/* Variáveis de cores para tema claro */
+:root {
+  --background-color: #fafafa;
+  --text-color: #4a4a4a;
+  --container-bg: #fff;
+  --input-border: #e0e0e0;
+  --primary-color: #ff7f50;
+  --primary-hover: #ff6347;
+  --footer-color: #888;
+}
+
+/* Variáveis de cores para tema escuro */
+[data-theme="dark"] {
+  --background-color: #1e1e1e;
+  --text-color: #f0f0f0;
+  --container-bg: #2d2d2d;
+  --input-border: #444;
+  --primary-color: #ff7f50;
+  --primary-hover: #ff6347;
+  --footer-color: #aaa;
+}
+
+/* Reset básico */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  padding: 20px;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  background: var(--container-bg);
+  padding: 30px;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+header h1 {
+  font-family: 'Comic Neue', cursive;
+  font-size: 2.5rem;
+  color: var(--primary-color);
+  margin-bottom: 10px;
+}
+
+header p {
+  font-size: 1.1rem;
+  color: var(--text-color);
+}
+
+#themeToggle {
+  background-color: var(--primary-color);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 15px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#themeToggle:hover {
+  background-color: var(--primary-hover);
+}
+
+.section {
+  margin-bottom: 25px;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeInUp 0.5s ease forwards;
+}
+
+.section h2 {
+  font-size: 1.5rem;
+  color: var(--text-color);
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section h2 i {
+  color: var(--primary-color);
+}
+
+input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 15px;
+  border: 2px solid var(--input-border);
+  border-radius: 10px;
+  font-size: 1rem;
+  background-color: var(--container-bg);
+  color: var(--text-color);
+}
+
+input:focus {
+  border-color: var(--primary-color);
+  outline: none;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  background-color: var(--primary-color);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+button:hover {
+  background-color: var(--primary-hover);
+}
+
+button i {
+  font-size: 1.2rem;
+}
+
+p {
+  margin-top: 15px;
+  font-size: 1.1rem;
+  color: var(--text-color);
+}
+
+footer {
+  text-align: center;
+  margin-top: 30px;
+  font-size: 0.9rem;
+  color: var(--footer-color);
+  opacity: 0;
+  animation: fadeIn 1s ease 0.5s forwards;
+}
+
+footer p {
+  margin: 0;
+}
+
+/* Animações */
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  opacity: 0;
+  animation: fadeIn 0.5s ease forwards;
+}
