@@ -30,10 +30,3 @@ Hey Calorie! is a simple and cute web application that helps you track your dail
    - Click the "Dark Theme" button to toggle between dark and light modes.
 
 ---
-
-## Setup 🛠️
-
-### Prerequisites
-- A modern web browser (Chrome, Firefox, Edge, etc.).
-- (Optional) A local server (e.g., Live Server in VS Code) for testing.
-
