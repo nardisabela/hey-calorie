@@ -1,5 +1,13 @@
 let database;
 
+// Função para normalizar texto (remover acentos e converter para minúsculas)
+function normalizarTexto(texto) {
+  return texto
+    .normalize('NFD') // Normaliza caracteres acentuados para sua forma decomposta
+    .replace(/[\u0300-\u036f]/g, '') // Remove os acentos
+    .toLowerCase(); // Converte para minúsculas
+}
+
 // Função para carregar o Excel e converter para JSON
 async function carregarDatabase() {
   try {
@@ -20,6 +28,7 @@ async function carregarDatabase() {
     database = { alimentos: {}, exercicios: {} };
     for (let i = 1; i < jsonData.length; i++) {
       const [nome, categoria, subcategoria, calorias, lipidios, proteinas, carboidratos, tipo] = jsonData[i];
+      const nomeNormalizado = normalizarTexto(nome); // Normaliza o nome do item
       if (tipo === 'alimento') {
         if (!database.alimentos[categoria]) {
           database.alimentos[categoria] = {};
@@ -27,7 +36,7 @@ async function carregarDatabase() {
         if (!database.alimentos[categoria][subcategoria]) {
           database.alimentos[categoria][subcategoria] = {};
         }
-        database.alimentos[categoria][subcategoria][nome.toLowerCase()] = {
+        database.alimentos[categoria][subcategoria][nomeNormalizado] = {
           calorias,
           lipidios,
           proteinas,
@@ -40,7 +49,7 @@ async function carregarDatabase() {
         if (!database.exercicios[categoria][subcategoria]) {
           database.exercicios[categoria][subcategoria] = {};
         }
-        database.exercicios[categoria][subcategoria][nome.toLowerCase()] = {
+        database.exercicios[categoria][subcategoria][nomeNormalizado] = {
           calorias,
         };
       }
@@ -54,17 +63,18 @@ async function carregarDatabase() {
 
 // Função para buscar nutrientes de um item
 function buscarNutrientes(item, tipo) {
-  console.log('Buscando item:', item);
+  const itemNormalizado = normalizarTexto(item); // Normaliza a entrada do usuário
+  console.log('Buscando item:', itemNormalizado);
   const categoriaBase = tipo === 'alimento' ? database.alimentos : database.exercicios;
   for (const categoria in categoriaBase) {
     for (const subcategoria in categoriaBase[categoria]) {
-      if (categoriaBase[categoria][subcategoria][item]) {
-        console.log('Item encontrado:', item, 'Nutrientes:', categoriaBase[categoria][subcategoria][item]);
-        return categoriaBase[categoria][subcategoria][item];
+      if (categoriaBase[categoria][subcategoria][itemNormalizado]) {
+        console.log('Item encontrado:', itemNormalizado, 'Nutrientes:', categoriaBase[categoria][subcategoria][itemNormalizado]);
+        return categoriaBase[categoria][subcategoria][itemNormalizado];
       }
     }
   }
-  console.log('Item não encontrado:', item);
+  console.log('Item não encontrado:', itemNormalizado);
   return null;
 }
 
@@ -91,7 +101,7 @@ function calcularNutrientes(item, quantidade, tipo) {
 
 // Eventos dos botões
 document.getElementById('foodButton').addEventListener('click', () => {
-  const foodInput = document.getElementById('foodInput').value.trim().toLowerCase();
+  const foodInput = document.getElementById('foodInput').value.trim();
   const quantidade = parseFloat(document.getElementById('foodQuantity').value);
   const foodResult = document.getElementById('foodResult');
   const lipidiosResult = document.getElementById('lipidiosResult');
@@ -121,7 +131,7 @@ document.getElementById('foodButton').addEventListener('click', () => {
 });
 
 document.getElementById('exerciseButton').addEventListener('click', () => {
-  const exerciseInput = document.getElementById('exerciseInput').value.trim().toLowerCase();
+  const exerciseInput = document.getElementById('exerciseInput').value.trim();
   const minutos = parseFloat(document.getElementById('exerciseDuration').value);
   const exerciseResult = document.getElementById('exerciseResult');
 
