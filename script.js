@@ -6,45 +6,57 @@ function normalizeText(text) {
     .toLowerCase();
 }
 
-// Search Open Food Facts API
+// Search Open Food Facts API with timeout and error handling
 async function searchOpenFoodFacts(query) {
   const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&json=1&fields=product_name,nutriments,serving_size,brands`;
   
   try {
-    const response = await fetch(url);
+    // Add timeout to fetch request
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
     const data = await response.json();
     
     if (data.products && data.products.length > 0) {
-      // Return the first matching product
-      const product = data.products[0];
+      // Find the first product with complete nutrition data
+      const product = data.products.find(p => p.nutriments?.['energy-kcal_100g']) || data.products[0];
+      
       return {
-        name: product.product_name,
-        calories: product.nutriments?.['energy-kcal_100g'],
+        name: product.product_name || query,
+        calories: product.nutriments?.['energy-kcal_100g'] || 0,
         servingSize: product.serving_size || '100g',
         nutrients: {
-          fat: product.nutriments?.fat_100g,
-          proteins: product.nutriments?.proteins_100g,
-          carbohydrates: product.nutriments?.carbohydrates_100g
+          fat: product.nutriments?.fat_100g || 0,
+          proteins: product.nutriments?.proteins_100g || 0,
+          carbohydrates: product.nutriments?.carbohydrates_100g || 0
         }
       };
     }
     return null;
   } catch (error) {
-    console.error("Error fetching from Open Food Facts:", error);
+    console.error("API Error:", error);
     return null;
   }
 }
 
-// Calculate nutrients based on quantity (async)
+// Calculate nutrients based on quantity
 async function calculateNutrients(item, quantity, type) {
   if (type === 'food') {
     const foodData = await searchOpenFoodFacts(item);
     if (foodData) {
-      // Calculate based on serving size or default to 100g
+      // Extract numeric value from serving size (e.g., "100g" → 100)
       const servingSize = parseFloat(foodData.servingSize) || 100;
       const ratio = quantity / servingSize;
       
       return {
+        name: foodData.name,
         calories: (foodData.calories || 0) * ratio,
         fat: (foodData.nutrients?.fat || 0) * ratio,
         proteins: (foodData.nutrients?.proteins || 0) * ratio,
@@ -53,12 +65,36 @@ async function calculateNutrients(item, quantity, type) {
     }
     return null;
   } else if (type === 'exercise') {
-    // For exercises, you might want to keep your local database
-    // or implement another API. This is just a placeholder.
+    // Simple exercise calculations (you can expand this)
+    const exerciseCalories = {
+      'walking': 4,
+      'running': 10,
+      'cycling': 8,
+      'swimming': 7
+    };
+    
+    const normalizedExercise = normalizeText(item);
+    const caloriesPerMin = exerciseCalories[normalizedExercise] || 5;
+    
     return {
-      calories: quantity * 5, // Example: 5 calories per minute
+      calories: caloriesPerMin * quantity
     };
   }
+}
+
+// Display helpers
+function showLoading(element) {
+  element.textContent = "Searching...";
+}
+
+function showError(element, message) {
+  element.textContent = message;
+  element.style.color = "red";
+}
+
+function showResults(element, message) {
+  element.textContent = message;
+  element.style.color = "";
 }
 
 // Food button event listener
@@ -67,28 +103,36 @@ document.getElementById('foodButton').addEventListener('click', async () => {
   const quantity = parseFloat(document.getElementById('foodQuantity').value);
   const foodResult = document.getElementById('foodResult');
   const fatResult = document.getElementById('fatResult');
-  const proteinsResult = document.getElementById('proteinsResult');
+  const proteinResult = document.getElementById('proteinResult');
   const carbsResult = document.getElementById('carbsResult');
 
-  // Show loading state
-  foodResult.textContent = "Searching...";
-  fatResult.textContent = "";
-  proteinsResult.textContent = "";
-  carbsResult.textContent = "";
+  // Clear previous results
+  [foodResult, fatResult, proteinResult, carbsResult].forEach(el => {
+    el.textContent = "";
+    el.style.color = "";
+  });
 
-  if (foodInput && !isNaN(quantity) && quantity > 0) {
+  if (!foodInput || isNaN(quantity) || quantity <= 0) {
+    showError(foodResult, "Please enter valid food and quantity");
+    return;
+  }
+
+  showLoading(foodResult);
+  
+  try {
     const nutrients = await calculateNutrients(foodInput, quantity, 'food');
-
-    if (nutrients !== null) {
-      foodResult.textContent = `Calories: ${nutrients.calories.toFixed(2)}`;
-      fatResult.textContent = `Fat: ${nutrients.fat.toFixed(2)}g`;
-      proteinsResult.textContent = `Proteins: ${nutrients.proteins.toFixed(2)}g`;
-      carbsResult.textContent = `Carbs: ${nutrients.carbohydrates.toFixed(2)}g`;
+    
+    if (nutrients) {
+      showResults(foodResult, `Food: ${nutrients.name}`);
+      showResults(fatResult, `Calories: ${nutrients.calories.toFixed(2)} kcal`);
+      showResults(proteinResult, `Fat: ${nutrients.fat.toFixed(2)}g | Protein: ${nutrients.proteins.toFixed(2)}g`);
+      showResults(carbsResult, `Carbs: ${nutrients.carbohydrates.toFixed(2)}g`);
     } else {
-      foodResult.textContent = 'Food not found. Try a different name.';
+      showError(foodResult, "Food not found. Try a different name.");
     }
-  } else {
-    foodResult.textContent = 'Please enter a valid food and quantity.';
+  } catch (error) {
+    console.error("Calculation Error:", error);
+    showError(foodResult, "Failed to get data. Please try again.");
   }
 });
 
@@ -98,16 +142,22 @@ document.getElementById('exerciseButton').addEventListener('click', async () => 
   const minutes = parseFloat(document.getElementById('exerciseDuration').value);
   const exerciseResult = document.getElementById('exerciseResult');
 
-  if (exerciseInput && !isNaN(minutes) && minutes > 0) {
-    const calories = await calculateNutrients(exerciseInput, minutes, 'exercise');
+  exerciseResult.textContent = "";
+  exerciseResult.style.color = "";
 
-    if (calories !== null) {
-      exerciseResult.textContent = `Calories Burned: ${calories.calories.toFixed(2)}`;
-    } else {
-      exerciseResult.textContent = 'Exercise not found. Please try again.';
-    }
-  } else {
-    exerciseResult.textContent = 'Please enter a valid exercise and duration.';
+  if (!exerciseInput || isNaN(minutes) || minutes <= 0) {
+    showError(exerciseResult, "Please enter valid exercise and duration");
+    return;
+  }
+
+  showLoading(exerciseResult);
+  
+  try {
+    const calories = await calculateNutrients(exerciseInput, minutes, 'exercise');
+    showResults(exerciseResult, `Calories burned: ${calories.calories.toFixed(2)} kcal`);
+  } catch (error) {
+    console.error("Exercise Error:", error);
+    showError(exerciseResult, "Failed to calculate. Please try again.");
   }
 });
 
@@ -121,3 +171,6 @@ themeToggle.addEventListener('click', () => {
     ? '<i class="fas fa-sun"></i> Light Theme' 
     : '<i class="fas fa-moon"></i> Dark Theme';
 });
+
+// Initialize with light theme
+body.dataset.theme = 'light';
