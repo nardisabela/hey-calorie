@@ -1,247 +1,161 @@
-document.addEventListener("DOMContentLoaded", () => {
-  // Utility functions
-  function normalizeText(text) {
-    return text
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .toLowerCase();
-  }
+let database;
 
-  // Debounce function to limit API calls
-  function debounce(func, delay) {
-    let timeoutId;
-    return function(...args) {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        func.apply(this, args);
-      }, delay);
-    };
-  }
+// Função para normalizar texto (remover acentos e converter para minúsculas)
+function normalizarTexto(texto) {
+  return texto
+    .normalize('NFD') // Normaliza caracteres acentuados para sua forma decomposta
+    .replace(/[\u0300-\u036f]/g, '') // Remove os acentos
+    .toLowerCase(); // Converte para minúsculas
+}
 
-  // Highlight matching text in suggestions
-  function highlightMatch(text, query) {
-    const normalizedText = normalizeText(text);
-    const normalizedQuery = normalizeText(query);
-    const startIndex = normalizedText.indexOf(normalizedQuery);
-    
-    if (startIndex === -1) return text;
-    
-    const endIndex = startIndex + query.length;
-    return (
-      text.substring(0, startIndex) +
-      '<span class="highlight">' +
-      text.substring(startIndex, endIndex) +
-      '</span>' +
-      text.substring(endIndex)
-    );
-  }
+// Função para carregar o Excel e converter para JSON
+async function carregarDatabase() {
+  try {
+    // Carrega o arquivo Excel
+    const response = await fetch('database.xlsx');
+    if (!response.ok) {
+      throw new Error('Erro ao carregar a base de dados');
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
 
-  // Food search API call
-  async function searchOpenFoodFacts(query) {
-    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&json=1&fields=product_name,nutriments,serving_size,brands`;
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeout);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      return data.products || [];
-    } catch (error) {
-      console.error("API Error:", error);
-      return [];
+    // Converte a primeira planilha para JSON
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+    // Converte o JSON para a estrutura desejada
+    database = { alimentos: {}, exercicios: {} };
+    for (let i = 1; i < jsonData.length; i++) {
+      const [nome, categoria, subcategoria, calorias, lipidios, proteinas, carboidratos, tipo] = jsonData[i];
+      const nomeNormalizado = normalizarTexto(nome); // Normaliza o nome do item
+      if (tipo === 'alimento') {
+        if (!database.alimentos[categoria]) {
+          database.alimentos[categoria] = {};
+        }
+        if (!database.alimentos[categoria][subcategoria]) {
+          database.alimentos[categoria][subcategoria] = {};
+        }
+        database.alimentos[categoria][subcategoria][nomeNormalizado] = {
+          calorias,
+          lipidios,
+          proteinas,
+          carboidratos,
+        };
+      } else if (tipo === 'exercício') {
+        if (!database.exercicios[categoria]) {
+          database.exercicios[categoria] = {};
+        }
+        if (!database.exercicios[categoria][subcategoria]) {
+          database.exercicios[categoria][subcategoria] = {};
+        }
+        database.exercicios[categoria][subcategoria][nomeNormalizado] = {
+          calorias,
+        };
+      }
+    }
+
+    console.log('Base de dados carregada:', database);
+  } catch (error) {
+    console.error('Erro ao carregar a base de dados:', error);
+  }
+}
+
+// Função para buscar nutrientes de um item
+function buscarNutrientes(item, tipo) {
+  const itemNormalizado = normalizarTexto(item); // Normaliza a entrada do usuário
+  console.log('Buscando item:', itemNormalizado);
+  const categoriaBase = tipo === 'alimento' ? database.alimentos : database.exercicios;
+  for (const categoria in categoriaBase) {
+    for (const subcategoria in categoriaBase[categoria]) {
+      if (categoriaBase[categoria][subcategoria][itemNormalizado]) {
+        console.log('Item encontrado:', itemNormalizado, 'Nutrientes:', categoriaBase[categoria][subcategoria][itemNormalizado]);
+        return categoriaBase[categoria][subcategoria][itemNormalizado];
+      }
     }
   }
+  console.log('Item não encontrado:', itemNormalizado);
+  return null;
+}
 
-  // Filter and sort products for better suggestions
-  function filterAndSortProducts(products, query) {
-    const normalizedQuery = normalizeText(query);
-    return products
-      .filter(p => p.product_name && normalizeText(p.product_name).includes(normalizedQuery))
-      .sort((a, b) => {
-        // Sort by relevance (exact matches first)
-        const aName = normalizeText(a.product_name);
-        const bName = normalizeText(b.product_name);
-        
-        if (aName.startsWith(normalizedQuery) && !bName.startsWith(normalizedQuery)) return -1;
-        if (!aName.startsWith(normalizedQuery) && bName.startsWith(normalizedQuery)) return 1;
-        
-        // Then by completeness of data
-        const aScore = (a.nutriments ? 1 : 0) + (a.serving_size ? 1 : 0);
-        const bScore = (b.nutriments ? 1 : 0) + (b.serving_size ? 1 : 0);
-        return bScore - aScore;
-      });
-  }
-
-  function showError(element, message) {
-    if (element) {
-      element.textContent = message;
-      element.style.color = "red";
+// Função para calcular nutrientes de um alimento ou exercício
+function calcularNutrientes(item, quantidade, tipo) {
+  const nutrientesPor100g = buscarNutrientes(item, tipo);
+  if (nutrientesPor100g !== null) {
+    if (tipo === 'alimento') {
+      return {
+        calorias: (nutrientesPor100g.calorias * quantidade) / 100,
+        lipidios: (nutrientesPor100g.lipidios * quantidade) / 100,
+        proteinas: (nutrientesPor100g.proteinas * quantidade) / 100,
+        carboidratos: (nutrientesPor100g.carboidratos * quantidade) / 100,
+      };
+    } else if (tipo === 'exercício') {
+      return {
+        calorias: nutrientesPor100g.calorias * quantidade,
+      };
     }
+  } else {
+    return null;
   }
+}
 
-  function showResults(element, message) {
-    if (element) {
-      element.innerHTML = message;
-      element.style.color = "";
+// Eventos dos botões
+document.getElementById('foodButton').addEventListener('click', () => {
+  const foodInput = document.getElementById('foodInput').value.trim();
+  const quantidade = parseFloat(document.getElementById('foodQuantity').value);
+  const foodResult = document.getElementById('foodResult');
+  const lipidiosResult = document.getElementById('lipidiosResult');
+  const proteinasResult = document.getElementById('proteinasResult');
+  const carboidratosResult = document.getElementById('carboidratosResult');
+
+  if (foodInput && !isNaN(quantidade) && quantidade > 0) {
+    const nutrientes = calcularNutrientes(foodInput, quantidade, 'alimento');
+
+    if (nutrientes !== null) {
+      foodResult.textContent = `Calorias: ${nutrientes.calorias.toFixed(2)}`;
+      lipidiosResult.textContent = `Lípidos: ${nutrientes.lipidios.toFixed(2)}g`;
+      proteinasResult.textContent = `Proteínas: ${nutrientes.proteinas.toFixed(2)}g`;
+      carboidratosResult.textContent = `Carboidratos: ${nutrientes.carboidratos.toFixed(2)}g`;
+    } else {
+      foodResult.textContent = 'Item não encontrado. Verifique o nome e tente novamente.';
+      lipidiosResult.textContent = '';
+      proteinasResult.textContent = '';
+      carboidratosResult.textContent = '';
     }
+  } else {
+    foodResult.textContent = 'Por favor, insira um item e uma quantidade válida.';
+    lipidiosResult.textContent = '';
+    proteinasResult.textContent = '';
+    carboidratosResult.textContent = '';
   }
+});
 
-  // DOM elements
-  const foodInput = document.getElementById('foodInput');
-  const foodSuggestions = document.getElementById('foodSuggestions');
-  const foodButton = document.getElementById('foodButton');
-  const exerciseButton = document.getElementById('exerciseButton');
-  const themeToggle = document.getElementById('themeToggle');
+document.getElementById('exerciseButton').addEventListener('click', () => {
+  const exerciseInput = document.getElementById('exerciseInput').value.trim();
+  const minutos = parseFloat(document.getElementById('exerciseDuration').value);
+  const exerciseResult = document.getElementById('exerciseResult');
 
-  // Enhanced food input with debounced suggestions
-  if (foodInput && foodSuggestions) {
-    const showSuggestions = debounce(async (query) => {
-      if (query.length < 2) {
-        foodSuggestions.innerHTML = "";
-        foodSuggestions.classList.remove('active');
-        return;
-      }
-      
-      foodSuggestions.innerHTML = "<div class='suggestion'>Searching...</div>";
-      foodSuggestions.classList.add('active');
-      
-      try {
-        const products = await searchOpenFoodFacts(query);
-        const filteredProducts = filterAndSortProducts(products, query).slice(0, 5);
-        
-        if (filteredProducts.length === 0) {
-          foodSuggestions.innerHTML = "<div class='suggestion'>No matches found</div>";
-          return;
-        }
-        
-        foodSuggestions.innerHTML = filteredProducts
-          .map(p => `<div class='suggestion'>${highlightMatch(p.product_name, query)}</div>`)
-          .join('');
-        
-        // Add click handlers to suggestions
-        document.querySelectorAll('.suggestion').forEach(item => {
-          item.addEventListener('click', () => {
-            foodInput.value = item.textContent;
-            foodSuggestions.innerHTML = "";
-            foodSuggestions.classList.remove('active');
-            document.getElementById('foodQuantity').focus();
-          });
-        });
-      } catch (error) {
-        console.error("Suggestion Error:", error);
-        foodSuggestions.innerHTML = "<div class='suggestion'>Error loading suggestions</div>";
-      }
-    }, 300);
+  if (exerciseInput && !isNaN(minutos) && minutos > 0) {
+    const calorias = calcularNutrientes(exerciseInput, minutos, 'exercício');
 
-    foodInput.addEventListener('input', () => {
-      showSuggestions(foodInput.value.trim());
-    });
-
-    // Hide suggestions when clicking outside
-    document.addEventListener('click', (e) => {
-      if (!foodInput.contains(e.target) && !foodSuggestions.contains(e.target)) {
-        foodSuggestions.classList.remove('active');
-      }
-    });
-
-    // Keyboard navigation for suggestions
-    foodInput.addEventListener('keydown', (e) => {
-      if (!foodSuggestions.classList.contains('active')) return;
-      
-      const suggestions = document.querySelectorAll('.suggestion');
-      if (suggestions.length === 0) return;
-      
-      let currentIndex = -1;
-      suggestions.forEach((suggestion, index) => {
-        if (suggestion.classList.contains('selected')) {
-          currentIndex = index;
-          suggestion.classList.remove('selected');
-        }
-      });
-      
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const nextIndex = (currentIndex + 1) % suggestions.length;
-        suggestions[nextIndex].classList.add('selected');
-        suggestions[nextIndex].scrollIntoView({ block: 'nearest' });
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const prevIndex = (currentIndex - 1 + suggestions.length) % suggestions.length;
-        suggestions[prevIndex].classList.add('selected');
-        suggestions[prevIndex].scrollIntoView({ block: 'nearest' });
-      } else if (e.key === 'Enter' && currentIndex >= 0) {
-        e.preventDefault();
-        foodInput.value = suggestions[currentIndex].textContent;
-        foodSuggestions.innerHTML = "";
-        foodSuggestions.classList.remove('active');
-        document.getElementById('foodQuantity').focus();
-      }
-    });
+    if (calorias !== null) {
+      exerciseResult.textContent = `Calorias Gastas: ${calorias.calorias.toFixed(2)}`;
+    } else {
+      exerciseResult.textContent = 'Exercício não encontrado. Verifique o nome e tente novamente.';
+    }
+  } else {
+    exerciseResult.textContent = 'Por favor, insira um exercício e uma duração válida.';
   }
-  if (foodButton) {
-    foodButton.addEventListener('click', async () => {
-      const foodQuantity = document.getElementById('foodQuantity');
-      const foodResult = document.getElementById('foodResult');
-      if (!foodInput || !foodQuantity || !foodResult) return;
-      const food = foodInput.value.trim();
-      const quantity = parseFloat(foodQuantity.value);
-      if (!food || isNaN(quantity) || quantity <= 0) {
-        showError(foodResult, "Please enter valid food and quantity");
-        return;
-      }
-      showResults(foodResult, "Fetching data...");
-      try {
-        const products = await searchOpenFoodFacts(food);
-        const product = products.find(p => normalizeText(p.product_name) === normalizeText(food)) ||
-                        products.find(p => normalizeText(p.product_name).includes(normalizeText(food))) ||
-                        products[0];
-        if (product) {
-          const servingSize = parseFloat(product.serving_size) || 100;
-          const ratio = quantity / servingSize;
-          showResults(foodResult, `
-            <strong>Food:</strong> ${product.product_name} <br>
-            <strong>Calories:</strong> ${(product.nutriments?.['energy-kcal_100g'] * ratio).toFixed(2)} kcal <br>
-            <strong>Fat:</strong> ${(product.nutriments?.fat_100g * ratio).toFixed(2)}g <br>
-            <strong>Protein:</strong> ${(product.nutriments?.proteins_100g * ratio).toFixed(2)}g <br>
-            <strong>Carbs:</strong> ${(product.nutriments?.carbohydrates_100g * ratio).toFixed(2)}g
-          `);
-        } else {
-          showError(foodResult, "Food not found. Try a different name.");
-        }
-      } catch (error) {
-        console.error("Food Fetch Error:", error);
-        showError(foodResult, "Failed to get data. Please try again.");
-      }
-    });
-  }
+});
 
-  if (exerciseButton) {
-    exerciseButton.addEventListener('click', async () => {
-      const exerciseInput = document.getElementById('exerciseInput');
-      const exerciseDuration = document.getElementById('exerciseDuration');
-      const exerciseResult = document.getElementById('exerciseResult');
-      if (!exerciseInput || !exerciseDuration || !exerciseResult) return;
-      const exercise = exerciseInput.value.trim();
-      const minutes = parseFloat(exerciseDuration.value);
-      if (!exercise || isNaN(minutes) || minutes <= 0) {
-        showError(exerciseResult, "Please enter valid exercise and duration");
-        return;
-      }
-      showResults(exerciseResult, "Calculating...");
-      const result = calculateExerciseCalories(exercise, minutes);
-      showResults(exerciseResult, `Calories burned: ${result.calories} kcal`);
-    });
-  }
+// Carrega a base de dados ao iniciar o aplicativo
+carregarDatabase();
 
-  if (themeToggle) {
-    themeToggle.addEventListener('click', () => {
-      document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
-      themeToggle.innerHTML = document.body.dataset.theme === 'dark' 
-        ? '<i class="fas fa-sun"></i> Light Theme' 
-        : '<i class="fas fa-moon"></i> Dark Theme';
-    });
-  }
+// Alternar tema escuro/claro
+const themeToggle = document.getElementById('themeToggle');
+const body = document.body;
 
-  document.body.dataset.theme = 'light';
+themeToggle.addEventListener('click', () => {
+  body.dataset.theme = body.dataset.theme === 'dark' ? 'light' : 'dark';
+  themeToggle.innerHTML = body.dataset.theme === 'dark' ? '<i class="fas fa-sun"></i> Tema Claro' : '<i class="fas fa-moon"></i> Tema Escuro';
 });
