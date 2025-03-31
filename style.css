@@ -1,4 +1,4 @@
-/* Variáveis de cores para tema claro */
+/* Light Theme Variables */
 :root {
   --background-color: #fafafa;
   --text-color: #4a4a4a;
@@ -9,7 +9,7 @@
   --footer-color: #888;
 }
 
-/* Variáveis de cores para tema escuro */
+/* Dark Theme Variables */
 [data-theme="dark"] {
   --background-color: #1e1e1e;
   --text-color: #f0f0f0;
@@ -20,26 +20,7 @@
   --footer-color: #aaa;
 }
 
-.suggestions-container {
-  position: absolute;
-  background: white;
-  border: 1px solid #ccc;
-  max-height: 150px;
-  overflow-y: auto;
-  width: 100%;
-  z-index: 1000;
-}
-
-.suggestion {
-  padding: 10px;
-  cursor: pointer;
-}
-
-.suggestion:hover {
-  background: #f0f0f0;
-}
-
-/* Reset básico */
+/* Reset */
 * {
   margin: 0;
   padding: 0;
@@ -99,6 +80,7 @@ header p {
   background-color: var(--primary-hover);
 }
 
+/* Section Styling */
 .section {
   margin-bottom: 25px;
   opacity: 0;
@@ -135,6 +117,7 @@ input:focus {
   outline: none;
 }
 
+/* Button */
 button {
   width: 100%;
   padding: 12px;
@@ -158,12 +141,49 @@ button i {
   font-size: 1.2rem;
 }
 
+/* Food Suggestions Dropdown */
+.suggestions-container {
+  position: absolute;
+  background: var(--container-bg);
+  border: 1px solid var(--input-border);
+  max-height: 150px;
+  overflow-y: auto;
+  width: calc(100% - 4px);
+  z-index: 1000;
+  display: none; /* Hidden by default */
+  border-radius: 5px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.suggestions-container.active {
+  display: block; /* Show when active */
+}
+
+.suggestion {
+  padding: 10px;
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--text-color);
+}
+
+.suggestion:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
+/* Position relative for input wrapper to fix dropdown alignment */
+.section {
+  position: relative;
+}
+
+/* Paragraph Styling */
 p {
   margin-top: 15px;
   font-size: 1.1rem;
   color: var(--text-color);
 }
 
+/* Footer */
 footer {
   text-align: center;
   margin-top: 30px;
@@ -177,7 +197,7 @@ footer p {
   margin: 0;
 }
 
-/* Animações */
+/* Animations */
 @keyframes fadeInUp {
   to {
     opacity: 1;
