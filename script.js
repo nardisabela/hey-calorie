@@ -1,161 +1,123 @@
-let database;
-
-// Função para normalizar texto (remover acentos e converter para minúsculas)
-function normalizarTexto(texto) {
-  return texto
-    .normalize('NFD') // Normaliza caracteres acentuados para sua forma decomposta
-    .replace(/[\u0300-\u036f]/g, '') // Remove os acentos
-    .toLowerCase(); // Converte para minúsculas
+// Text normalization function (remove accents and convert to lowercase)
+function normalizeText(text) {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 }
 
-// Função para carregar o Excel e converter para JSON
-async function carregarDatabase() {
+// Search Open Food Facts API
+async function searchOpenFoodFacts(query) {
+  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&json=1&fields=product_name,nutriments,serving_size,brands`;
+  
   try {
-    // Carrega o arquivo Excel
-    const response = await fetch('database.xlsx');
-    if (!response.ok) {
-      throw new Error('Erro ao carregar a base de dados');
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.products && data.products.length > 0) {
+      // Return the first matching product
+      const product = data.products[0];
+      return {
+        name: product.product_name,
+        calories: product.nutriments?.['energy-kcal_100g'],
+        servingSize: product.serving_size || '100g',
+        nutrients: {
+          fat: product.nutriments?.fat_100g,
+          proteins: product.nutriments?.proteins_100g,
+          carbohydrates: product.nutriments?.carbohydrates_100g
+        }
+      };
     }
-    const arrayBuffer = await response.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-
-    // Converte a primeira planilha para JSON
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-    // Converte o JSON para a estrutura desejada
-    database = { alimentos: {}, exercicios: {} };
-    for (let i = 1; i < jsonData.length; i++) {
-      const [nome, categoria, subcategoria, calorias, lipidios, proteinas, carboidratos, tipo] = jsonData[i];
-      const nomeNormalizado = normalizarTexto(nome); // Normaliza o nome do item
-      if (tipo === 'alimento') {
-        if (!database.alimentos[categoria]) {
-          database.alimentos[categoria] = {};
-        }
-        if (!database.alimentos[categoria][subcategoria]) {
-          database.alimentos[categoria][subcategoria] = {};
-        }
-        database.alimentos[categoria][subcategoria][nomeNormalizado] = {
-          calorias,
-          lipidios,
-          proteinas,
-          carboidratos,
-        };
-      } else if (tipo === 'exercício') {
-        if (!database.exercicios[categoria]) {
-          database.exercicios[categoria] = {};
-        }
-        if (!database.exercicios[categoria][subcategoria]) {
-          database.exercicios[categoria][subcategoria] = {};
-        }
-        database.exercicios[categoria][subcategoria][nomeNormalizado] = {
-          calorias,
-        };
-      }
-    }
-
-    console.log('Base de dados carregada:', database);
+    return null;
   } catch (error) {
-    console.error('Erro ao carregar a base de dados:', error);
-  }
-}
-
-// Função para buscar nutrientes de um item
-function buscarNutrientes(item, tipo) {
-  const itemNormalizado = normalizarTexto(item); // Normaliza a entrada do usuário
-  console.log('Buscando item:', itemNormalizado);
-  const categoriaBase = tipo === 'alimento' ? database.alimentos : database.exercicios;
-  for (const categoria in categoriaBase) {
-    for (const subcategoria in categoriaBase[categoria]) {
-      if (categoriaBase[categoria][subcategoria][itemNormalizado]) {
-        console.log('Item encontrado:', itemNormalizado, 'Nutrientes:', categoriaBase[categoria][subcategoria][itemNormalizado]);
-        return categoriaBase[categoria][subcategoria][itemNormalizado];
-      }
-    }
-  }
-  console.log('Item não encontrado:', itemNormalizado);
-  return null;
-}
-
-// Função para calcular nutrientes de um alimento ou exercício
-function calcularNutrientes(item, quantidade, tipo) {
-  const nutrientesPor100g = buscarNutrientes(item, tipo);
-  if (nutrientesPor100g !== null) {
-    if (tipo === 'alimento') {
-      return {
-        calorias: (nutrientesPor100g.calorias * quantidade) / 100,
-        lipidios: (nutrientesPor100g.lipidios * quantidade) / 100,
-        proteinas: (nutrientesPor100g.proteinas * quantidade) / 100,
-        carboidratos: (nutrientesPor100g.carboidratos * quantidade) / 100,
-      };
-    } else if (tipo === 'exercício') {
-      return {
-        calorias: nutrientesPor100g.calorias * quantidade,
-      };
-    }
-  } else {
+    console.error("Error fetching from Open Food Facts:", error);
     return null;
   }
 }
 
-// Eventos dos botões
-document.getElementById('foodButton').addEventListener('click', () => {
+// Calculate nutrients based on quantity (async)
+async function calculateNutrients(item, quantity, type) {
+  if (type === 'food') {
+    const foodData = await searchOpenFoodFacts(item);
+    if (foodData) {
+      // Calculate based on serving size or default to 100g
+      const servingSize = parseFloat(foodData.servingSize) || 100;
+      const ratio = quantity / servingSize;
+      
+      return {
+        calories: (foodData.calories || 0) * ratio,
+        fat: (foodData.nutrients?.fat || 0) * ratio,
+        proteins: (foodData.nutrients?.proteins || 0) * ratio,
+        carbohydrates: (foodData.nutrients?.carbohydrates || 0) * ratio,
+      };
+    }
+    return null;
+  } else if (type === 'exercise') {
+    // For exercises, you might want to keep your local database
+    // or implement another API. This is just a placeholder.
+    return {
+      calories: quantity * 5, // Example: 5 calories per minute
+    };
+  }
+}
+
+// Food button event listener
+document.getElementById('foodButton').addEventListener('click', async () => {
   const foodInput = document.getElementById('foodInput').value.trim();
-  const quantidade = parseFloat(document.getElementById('foodQuantity').value);
+  const quantity = parseFloat(document.getElementById('foodQuantity').value);
   const foodResult = document.getElementById('foodResult');
-  const lipidiosResult = document.getElementById('lipidiosResult');
-  const proteinasResult = document.getElementById('proteinasResult');
-  const carboidratosResult = document.getElementById('carboidratosResult');
+  const fatResult = document.getElementById('fatResult');
+  const proteinsResult = document.getElementById('proteinsResult');
+  const carbsResult = document.getElementById('carbsResult');
 
-  if (foodInput && !isNaN(quantidade) && quantidade > 0) {
-    const nutrientes = calcularNutrientes(foodInput, quantidade, 'alimento');
+  // Show loading state
+  foodResult.textContent = "Searching...";
+  fatResult.textContent = "";
+  proteinsResult.textContent = "";
+  carbsResult.textContent = "";
 
-    if (nutrientes !== null) {
-      foodResult.textContent = `Calorias: ${nutrientes.calorias.toFixed(2)}`;
-      lipidiosResult.textContent = `Lípidos: ${nutrientes.lipidios.toFixed(2)}g`;
-      proteinasResult.textContent = `Proteínas: ${nutrientes.proteinas.toFixed(2)}g`;
-      carboidratosResult.textContent = `Carboidratos: ${nutrientes.carboidratos.toFixed(2)}g`;
+  if (foodInput && !isNaN(quantity) && quantity > 0) {
+    const nutrients = await calculateNutrients(foodInput, quantity, 'food');
+
+    if (nutrients !== null) {
+      foodResult.textContent = `Calories: ${nutrients.calories.toFixed(2)}`;
+      fatResult.textContent = `Fat: ${nutrients.fat.toFixed(2)}g`;
+      proteinsResult.textContent = `Proteins: ${nutrients.proteins.toFixed(2)}g`;
+      carbsResult.textContent = `Carbs: ${nutrients.carbohydrates.toFixed(2)}g`;
     } else {
-      foodResult.textContent = 'Item não encontrado. Verifique o nome e tente novamente.';
-      lipidiosResult.textContent = '';
-      proteinasResult.textContent = '';
-      carboidratosResult.textContent = '';
+      foodResult.textContent = 'Food not found. Try a different name.';
     }
   } else {
-    foodResult.textContent = 'Por favor, insira um item e uma quantidade válida.';
-    lipidiosResult.textContent = '';
-    proteinasResult.textContent = '';
-    carboidratosResult.textContent = '';
+    foodResult.textContent = 'Please enter a valid food and quantity.';
   }
 });
 
-document.getElementById('exerciseButton').addEventListener('click', () => {
+// Exercise button event listener
+document.getElementById('exerciseButton').addEventListener('click', async () => {
   const exerciseInput = document.getElementById('exerciseInput').value.trim();
-  const minutos = parseFloat(document.getElementById('exerciseDuration').value);
+  const minutes = parseFloat(document.getElementById('exerciseDuration').value);
   const exerciseResult = document.getElementById('exerciseResult');
 
-  if (exerciseInput && !isNaN(minutos) && minutos > 0) {
-    const calorias = calcularNutrientes(exerciseInput, minutos, 'exercício');
+  if (exerciseInput && !isNaN(minutes) && minutes > 0) {
+    const calories = await calculateNutrients(exerciseInput, minutes, 'exercise');
 
-    if (calorias !== null) {
-      exerciseResult.textContent = `Calorias Gastas: ${calorias.calorias.toFixed(2)}`;
+    if (calories !== null) {
+      exerciseResult.textContent = `Calories Burned: ${calories.calories.toFixed(2)}`;
     } else {
-      exerciseResult.textContent = 'Exercício não encontrado. Verifique o nome e tente novamente.';
+      exerciseResult.textContent = 'Exercise not found. Please try again.';
     }
   } else {
-    exerciseResult.textContent = 'Por favor, insira um exercício e uma duração válida.';
+    exerciseResult.textContent = 'Please enter a valid exercise and duration.';
   }
 });
 
-// Carrega a base de dados ao iniciar o aplicativo
-carregarDatabase();
-
-// Alternar tema escuro/claro
+// Theme toggle functionality
 const themeToggle = document.getElementById('themeToggle');
 const body = document.body;
 
 themeToggle.addEventListener('click', () => {
   body.dataset.theme = body.dataset.theme === 'dark' ? 'light' : 'dark';
-  themeToggle.innerHTML = body.dataset.theme === 'dark' ? '<i class="fas fa-sun"></i> Tema Claro' : '<i class="fas fa-moon"></i> Tema Escuro';
+  themeToggle.innerHTML = body.dataset.theme === 'dark' 
+    ? '<i class="fas fa-sun"></i> Light Theme' 
+    : '<i class="fas fa-moon"></i> Dark Theme';
 });
