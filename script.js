@@ -15,23 +15,10 @@ document.addEventListener("DOMContentLoaded", () => {
       clearTimeout(timeout);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
-      if (data.products && data.products.length > 0) {
-        const product = data.products.find(p => p.nutriments?.['energy-kcal_100g']) || data.products[0];
-        return {
-          name: product.product_name || query,
-          calories: product.nutriments?.['energy-kcal_100g'] || 0,
-          servingSize: product.serving_size || '100g',
-          nutrients: {
-            fat: product.nutriments?.fat_100g || 0,
-            proteins: product.nutriments?.proteins_100g || 0,
-            carbohydrates: product.nutriments?.carbohydrates_100g || 0
-          }
-        };
-      }
-      return null;
+      return data.products || [];
     } catch (error) {
       console.error("API Error:", error);
-      return null;
+      return [];
     }
   }
 
@@ -49,13 +36,32 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  const foodInput = document.getElementById('foodInput');
+  const foodSuggestions = document.getElementById('foodSuggestions');
   const foodButton = document.getElementById('foodButton');
   const exerciseButton = document.getElementById('exerciseButton');
   const themeToggle = document.getElementById('themeToggle');
 
+  if (foodInput) {
+    foodInput.addEventListener('input', async () => {
+      const query = foodInput.value.trim();
+      if (query.length < 2) {
+        foodSuggestions.innerHTML = "";
+        return;
+      }
+      const products = await searchOpenFoodFacts(query);
+      foodSuggestions.innerHTML = products.slice(0, 5).map(p => `<div class='suggestion'>${p.product_name}</div>`).join('');
+      document.querySelectorAll('.suggestion').forEach(item => {
+        item.addEventListener('click', () => {
+          foodInput.value = item.textContent;
+          foodSuggestions.innerHTML = "";
+        });
+      });
+    });
+  }
+
   if (foodButton) {
     foodButton.addEventListener('click', async () => {
-      const foodInput = document.getElementById('foodInput');
       const foodQuantity = document.getElementById('foodQuantity');
       const foodResult = document.getElementById('foodResult');
       if (!foodInput || !foodQuantity || !foodResult) return;
@@ -67,15 +73,17 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       showResults(foodResult, "Fetching data...");
       try {
-        const foodData = await searchOpenFoodFacts(food);
-        if (foodData) {
-          const ratio = quantity / (parseFloat(foodData.servingSize) || 100);
+        const products = await searchOpenFoodFacts(food);
+        const product = products.find(p => normalizeText(p.product_name) === normalizeText(food)) || products[0];
+        if (product) {
+          const servingSize = parseFloat(product.serving_size) || 100;
+          const ratio = quantity / servingSize;
           showResults(foodResult, `
-            <strong>Food:</strong> ${foodData.name} <br>
-            <strong>Calories:</strong> ${(foodData.calories * ratio).toFixed(2)} kcal <br>
-            <strong>Fat:</strong> ${(foodData.nutrients.fat * ratio).toFixed(2)}g <br>
-            <strong>Protein:</strong> ${(foodData.nutrients.proteins * ratio).toFixed(2)}g <br>
-            <strong>Carbs:</strong> ${(foodData.nutrients.carbohydrates * ratio).toFixed(2)}g
+            <strong>Food:</strong> ${product.product_name} <br>
+            <strong>Calories:</strong> ${(product.nutriments?.['energy-kcal_100g'] * ratio).toFixed(2)} kcal <br>
+            <strong>Fat:</strong> ${(product.nutriments?.fat_100g * ratio).toFixed(2)}g <br>
+            <strong>Protein:</strong> ${(product.nutriments?.proteins_100g * ratio).toFixed(2)}g <br>
+            <strong>Carbs:</strong> ${(product.nutriments?.carbohydrates_100g * ratio).toFixed(2)}g
           `);
         } else {
           showError(foodResult, "Food not found. Try a different name.");
