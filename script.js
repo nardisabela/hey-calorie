@@ -44,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function showResults(element, message) {
     if (element) {
-      element.textContent = message;
+      element.innerHTML = message;
       element.style.color = "";
     }
   }
@@ -58,9 +58,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const foodInput = document.getElementById('foodInput');
       const foodQuantity = document.getElementById('foodQuantity');
       const foodResult = document.getElementById('foodResult');
-      const fatResult = document.getElementById('fatResult');
-      const proteinResult = document.getElementById('proteinResult');
-      const carbsResult = document.getElementById('carbsResult');
       if (!foodInput || !foodQuantity || !foodResult) return;
       const food = foodInput.value.trim();
       const quantity = parseFloat(foodQuantity.value);
@@ -73,10 +70,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const foodData = await searchOpenFoodFacts(food);
         if (foodData) {
           const ratio = quantity / (parseFloat(foodData.servingSize) || 100);
-          showResults(foodResult, `Food: ${foodData.name}`);
-          showResults(fatResult, `Calories: ${(foodData.calories * ratio).toFixed(2)} kcal`);
-          showResults(proteinResult, `Fat: ${(foodData.nutrients.fat * ratio).toFixed(2)}g | Protein: ${(foodData.nutrients.proteins * ratio).toFixed(2)}g`);
-          showResults(carbsResult, `Carbs: ${(foodData.nutrients.carbohydrates * ratio).toFixed(2)}g`);
+          showResults(foodResult, `
+            <strong>Food:</strong> ${foodData.name} <br>
+            <strong>Calories:</strong> ${(foodData.calories * ratio).toFixed(2)} kcal <br>
+            <strong>Fat:</strong> ${(foodData.nutrients.fat * ratio).toFixed(2)}g <br>
+            <strong>Protein:</strong> ${(foodData.nutrients.proteins * ratio).toFixed(2)}g <br>
+            <strong>Carbs:</strong> ${(foodData.nutrients.carbohydrates * ratio).toFixed(2)}g
+          `);
         } else {
           showError(foodResult, "Food not found. Try a different name.");
         }
