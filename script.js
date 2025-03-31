@@ -74,7 +74,9 @@ document.addEventListener("DOMContentLoaded", () => {
       showResults(foodResult, "Fetching data...");
       try {
         const products = await searchOpenFoodFacts(food);
-        const product = products.find(p => normalizeText(p.product_name).includes(normalizeText(food))) || products[0];
+        const product = products.find(p => normalizeText(p.product_name) === normalizeText(food)) ||
+                        products.find(p => normalizeText(p.product_name).includes(normalizeText(food))) ||
+                        products[0];
         if (product) {
           const servingSize = parseFloat(product.serving_size) || 100;
           const ratio = quantity / servingSize;
