@@ -1,4 +1,5 @@
 let alimentos = [];
+let exercicios = [];
 
 const dias = [
   'Segunda',
@@ -16,7 +17,7 @@ const refeicoes = [
   'Jantar'
 ];
 
-// Normalizar texto
+// Normaliza texto
 function normalizarTexto(texto) {
   return texto
     .normalize('NFD')
@@ -24,52 +25,84 @@ function normalizarTexto(texto) {
     .toLowerCase();
 }
 
-// Carrega banco
+// Carrega database.xlsx
 async function carregarDatabase() {
 
-  const response = await fetch('database.xlsx');
+  try {
 
-  const arrayBuffer = await response.arrayBuffer();
+    const response =
+      await fetch('database.xlsx');
 
-  const workbook = XLSX.read(arrayBuffer, {
-    type: 'array'
-  });
+    if (!response.ok) {
+      throw new Error(
+        'Erro ao carregar database.xlsx'
+      );
+    }
 
-  const sheetName = workbook.SheetNames[0];
+    const arrayBuffer =
+      await response.arrayBuffer();
 
-  const worksheet = workbook.Sheets[sheetName];
+    const workbook =
+      XLSX.read(arrayBuffer, {
+        type: 'array'
+      });
 
-  const jsonData = XLSX.utils.sheet_to_json(
-    worksheet,
-    { header: 1 }
-  );
+    const sheetName =
+      workbook.SheetNames[0];
 
-  alimentos = [];
+    const worksheet =
+      workbook.Sheets[sheetName];
 
-  for (let i = 1; i < jsonData.length; i++) {
+    const jsonData =
+      XLSX.utils.sheet_to_json(
+        worksheet,
+        { header: 1 }
+      );
 
-    const [
-      nome,
-      categoria,
-      subcategoria,
-      calorias,
-      lipidios,
-      proteinas,
-      carboidratos,
-      tipo
-    ] = jsonData[i];
+    alimentos = [];
+    exercicios = [];
 
-    if (tipo === 'alimento') {
+    for (let i = 1; i < jsonData.length; i++) {
 
-      alimentos.push({
+      const [
         nome,
         categoria,
-        calorias
-      });
-    }
-  }
+        subcategoria,
+        calorias,
+        lipidios,
+        proteinas,
+        carboidratos,
+        tipo
+      ] = jsonData[i];
 
-  criarPlanner();
+      if (tipo === 'alimento') {
+
+        alimentos.push({
+          nome,
+          categoria,
+          calorias
+        });
+
+      } else if (tipo === 'exercício') {
+
+        exercicios.push({
+          nome,
+          categoria,
+          calorias
+        });
+      }
+    }
+
+    criarPlanner();
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert(
+      'Erro ao carregar database.xlsx. Execute o projeto usando Live Server.'
+    );
+  }
 }
 
 // Cria planner
@@ -82,7 +115,11 @@ function criarPlanner() {
 
   dias.forEach(dia => {
 
-    const card = document.createElement('div');
+    const diaKey =
+      normalizarTexto(dia);
+
+    const card =
+      document.createElement('div');
 
     card.className = 'day-card';
 
@@ -96,13 +133,13 @@ function criarPlanner() {
           <h3>${refeicao}</h3>
 
           <div
-            id="${normalizarTexto(dia)}-${normalizarTexto(refeicao)}"
+            id="${diaKey}-${normalizarTexto(refeicao)}"
           ></div>
 
           <button
             class="addMealButton"
             onclick="adicionarItem(
-              '${normalizarTexto(dia)}',
+              '${diaKey}',
               '${normalizarTexto(refeicao)}'
             )"
           >
@@ -113,31 +150,56 @@ function criarPlanner() {
 
       `).join('')}
 
+      <div class="meal-section">
+
+        <h3>🏃 Exercícios</h3>
+
+        <div id="${diaKey}-exercicios"></div>
+
+        <button
+          class="addMealButton"
+          onclick="adicionarExercicio('${diaKey}')"
+        >
+          + Adicionar Exercício
+        </button>
+
+      </div>
+
       <div
         class="daily-total"
-        id="total-${normalizarTexto(dia)}"
+        id="total-${diaKey}"
       >
-        Total: 0 kcal
+        Consumidas: 0 kcal<br>
+        Gastas: 0 kcal<br>
+        <strong>Saldo: 0 kcal</strong>
       </div>
     `;
 
     plannerGrid.appendChild(card);
 
-    carregarDia(normalizarTexto(dia));
+    carregarDia(diaKey);
   });
 }
 
-// Adiciona item
-function adicionarItem(dia, refeicao, itemSalvo = null) {
+// Adiciona alimento
+function adicionarItem(
+  dia,
+  refeicao,
+  itemSalvo = null
+) {
 
   const container =
-    document.getElementById(`${dia}-${refeicao}`);
+    document.getElementById(
+      `${dia}-${refeicao}`
+    );
 
-  const row = document.createElement('div');
+  const row =
+    document.createElement('div');
 
   row.className = 'meal-row';
 
   row.innerHTML = `
+
     <select>
 
       <option value="">
@@ -147,7 +209,10 @@ function adicionarItem(dia, refeicao, itemSalvo = null) {
       ${alimentos.map(alimento => `
         <option
           value="${alimento.nome}"
-          ${itemSalvo?.nome === alimento.nome ? 'selected' : ''}
+          ${itemSalvo?.nome === alimento.nome
+            ? 'selected'
+            : ''
+          }
         >
           ${alimento.nome}
         </option>
@@ -166,9 +231,11 @@ function adicionarItem(dia, refeicao, itemSalvo = null) {
     </button>
   `;
 
-  const select = row.querySelector('select');
+  const select =
+    row.querySelector('select');
 
-  const input = row.querySelector('input');
+  const input =
+    row.querySelector('input');
 
   const removeButton =
     row.querySelector('.removeMealButton');
@@ -182,7 +249,9 @@ function adicionarItem(dia, refeicao, itemSalvo = null) {
   });
 
   removeButton.addEventListener('click', () => {
+
     row.remove();
+
     salvarPlanner();
   });
 
@@ -191,11 +260,92 @@ function adicionarItem(dia, refeicao, itemSalvo = null) {
   atualizarCaloriasDia(dia);
 }
 
-// Calcula calorias
+// Adiciona exercício
+function adicionarExercicio(
+  dia,
+  itemSalvo = null
+) {
+
+  const container =
+    document.getElementById(
+      `${dia}-exercicios`
+    );
+
+  const row =
+    document.createElement('div');
+
+  row.className = 'meal-row';
+
+  row.innerHTML = `
+
+    <select>
+
+      <option value="">
+        Selecione
+      </option>
+
+      ${exercicios.map(exercicio => `
+        <option
+          value="${exercicio.nome}"
+          ${itemSalvo?.nome === exercicio.nome
+            ? 'selected'
+            : ''
+          }
+        >
+          ${exercicio.nome}
+        </option>
+      `).join('')}
+
+    </select>
+
+    <input
+      type="number"
+      placeholder="min"
+      value="${itemSalvo?.quantidade || ''}"
+    >
+
+    <button class="removeMealButton">
+      <i class="fas fa-trash"></i>
+    </button>
+  `;
+
+  const select =
+    row.querySelector('select');
+
+  const input =
+    row.querySelector('input');
+
+  const removeButton =
+    row.querySelector('.removeMealButton');
+
+  select.addEventListener('change', () => {
+    salvarPlanner();
+  });
+
+  input.addEventListener('input', () => {
+    salvarPlanner();
+  });
+
+  removeButton.addEventListener('click', () => {
+
+    row.remove();
+
+    salvarPlanner();
+  });
+
+  container.appendChild(row);
+
+  atualizarCaloriasDia(dia);
+}
+
+// Atualiza calorias do dia
 function atualizarCaloriasDia(dia) {
 
-  let total = 0;
+  let caloriasConsumidas = 0;
 
+  let caloriasGastadas = 0;
+
+  // Refeições
   refeicoes.forEach(refeicao => {
 
     const container =
@@ -221,18 +371,63 @@ function atualizarCaloriasDia(dia) {
           a => a.nome === alimentoNome
         );
 
-      if (alimento && quantidade > 0) {
+      if (
+        alimento &&
+        !isNaN(quantidade) &&
+        quantidade > 0
+      ) {
 
-        total +=
+        caloriasConsumidas +=
           (alimento.calorias * quantidade) / 100;
       }
     });
   });
 
+  // Exercícios
+  const exercicioContainer =
+    document.getElementById(
+      `${dia}-exercicios`
+    );
+
+  const exercicioRows =
+    exercicioContainer.querySelectorAll('.meal-row');
+
+  exercicioRows.forEach(row => {
+
+    const exercicioNome =
+      row.querySelector('select').value;
+
+    const minutos =
+      parseFloat(
+        row.querySelector('input').value
+      );
+
+    const exercicio =
+      exercicios.find(
+        e => e.nome === exercicioNome
+      );
+
+    if (
+      exercicio &&
+      !isNaN(minutos) &&
+      minutos > 0
+    ) {
+
+      caloriasGastadas +=
+        exercicio.calorias * minutos;
+    }
+  });
+
+  const saldo =
+    caloriasConsumidas - caloriasGastadas;
+
   document.getElementById(
     `total-${dia}`
-  ).textContent =
-    `Total: ${total.toFixed(2)} kcal`;
+  ).innerHTML = `
+    Consumidas: ${caloriasConsumidas.toFixed(2)} kcal<br>
+    Gastas: ${caloriasGastadas.toFixed(2)} kcal<br>
+    <strong>Saldo: ${saldo.toFixed(2)} kcal</strong>
+  `;
 }
 
 // Salva planner
@@ -247,6 +442,7 @@ function salvarPlanner() {
 
     planner[diaKey] = {};
 
+    // Refeições
     refeicoes.forEach(refeicao => {
 
       const refeicaoKey =
@@ -275,6 +471,29 @@ function salvarPlanner() {
       });
     });
 
+    // Exercícios
+    const exercicioContainer =
+      document.getElementById(
+        `${diaKey}-exercicios`
+      );
+
+    const exercicioRows =
+      exercicioContainer.querySelectorAll('.meal-row');
+
+    planner[diaKey].exercicios = [];
+
+    exercicioRows.forEach(row => {
+
+      planner[diaKey].exercicios.push({
+
+        nome:
+          row.querySelector('select').value,
+
+        quantidade:
+          row.querySelector('input').value
+      });
+    });
+
     atualizarCaloriasDia(diaKey);
   });
 
@@ -284,7 +503,7 @@ function salvarPlanner() {
   );
 }
 
-// Carrega planner
+// Carrega planner salvo
 function carregarDia(dia) {
 
   const planner =
@@ -294,6 +513,7 @@ function carregarDia(dia) {
 
   if (!planner[dia]) return;
 
+  // Refeições
   refeicoes.forEach(refeicao => {
 
     const refeicaoKey =
@@ -310,6 +530,18 @@ function carregarDia(dia) {
         item
       );
     });
+  });
+
+  // Exercícios
+  const exerciciosSalvos =
+    planner[dia].exercicios || [];
+
+  exerciciosSalvos.forEach(item => {
+
+    adicionarExercicio(
+      dia,
+      item
+    );
   });
 
   atualizarCaloriasDia(dia);
