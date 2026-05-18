@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Buscar Alimentos</title>
+
+  <link rel="stylesheet" href="style.css">
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+  <div class="container">
+
+    <header>
+      <h1>🔍 Buscar na Base</h1>
+      <p>Pesquise alimentos, bebidas e exercícios</p>
+
+      <a href="index.html" class="navButton">
+        <i class="fas fa-home"></i> Voltar
+      </a>
+    </header>
+
+    <div class="section">
+
+      <div class="search-controls">
+
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="Digite o nome..."
+        >
+
+        <select id="categoryFilter">
+          <option value="todos">Todos</option>
+          <option value="comida">Comida</option>
+          <option value="bebida">Bebida</option>
+          <option value="exercícios">Exercícios</option>
+        </select>
+
+      </div>
+
+      <div class="table-container">
+
+        <table id="resultsTable">
+
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Categoria</th>
+              <th>Subcategoria</th>
+              <th>Calorias</th>
+              <th>Lípidos</th>
+              <th>Proteínas</th>
+              <th>Carboidratos</th>
+              <th>Tipo</th>
+            </tr>
+          </thead>
+
+          <tbody id="resultsBody"></tbody>
+
+        </table>
+
+</div>
+
+    </div>
+
+  </div>
+
+  <script src="search.js"></script>
+
+</body>
+</html>
