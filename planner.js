@@ -171,7 +171,7 @@ function criarPlanner() {
       >
         Consumidas: 0 kcal<br>
         Gastas: 0 kcal<br>
-        <strong>Saldo: 0 kcal</strong>
+        <strong>Total: 0 kcal</strong>
       </div>
     `;
 
