@@ -1,31 +1,50 @@
 let allItems = [];
 
-// Normaliza texto
+// ------------------------------
+// NORMALIZA TEXTO
+// ------------------------------
 function normalizarTexto(texto) {
-  return texto
+  return (texto || "")
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
+    .toLowerCase()
+    .trim();
 }
 
-// Carrega o Excel
+// ------------------------------
+// NORMALIZA NÚMEROS (comma → dot)
+// ------------------------------
+function normalizarNumero(valor) {
+  if (typeof valor === "string") {
+    return parseFloat(valor.replace(",", "."));
+  }
+  return valor ?? 0;
+}
+
+// ------------------------------
+// CARREGA DATABASE
+// ------------------------------
 async function carregarDatabase() {
   try {
+    console.log("📦 Loading database.xlsx...");
 
-    const response = await fetch('database.xlsx');
+    const response = await fetch('./database.xlsx');
 
     if (!response.ok) {
-      throw new Error('Erro ao carregar a base de dados');
+      throw new Error(`Erro ao carregar database: ${response.status} ${response.statusText}`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
 
-    const workbook = XLSX.read(arrayBuffer, {
-      type: 'array'
-    });
+    console.log("📊 File size:", arrayBuffer.byteLength);
+
+    if (!arrayBuffer.byteLength) {
+      throw new Error("Arquivo Excel vazio ou inválido");
+    }
+
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
 
     const sheetName = workbook.SheetNames[0];
-
     const worksheet = workbook.Sheets[sheetName];
 
     const jsonData = XLSX.utils.sheet_to_json(worksheet, {
@@ -35,6 +54,8 @@ async function carregarDatabase() {
     allItems = [];
 
     for (let i = 1; i < jsonData.length; i++) {
+      const row = jsonData[i];
+      if (!row) continue;
 
       const [
         nome,
@@ -45,33 +66,41 @@ async function carregarDatabase() {
         proteinas,
         carboidratos,
         tipo
-      ] = jsonData[i];
+      ] = row;
 
       allItems.push({
-        nome,
-        categoria,
-        subcategoria,
-        calorias,
-        lipidios,
-        proteinas,
-        carboidratos,
-        tipo
+        nome: nome?.trim(),
+        categoria: normalizarTexto(categoria),
+        subcategoria: subcategoria?.trim(),
+        calorias: normalizarNumero(calorias),
+        lipidios: normalizarNumero(lipidios),
+        proteinas: normalizarNumero(proteinas),
+        carboidratos: normalizarNumero(carboidratos),
+        tipo: normalizarTexto(tipo)
       });
     }
+
+    console.log("✅ Items loaded:", allItems.length);
 
     renderizarResultados(allItems);
 
   } catch (error) {
-    console.error(error);
+    console.error("❌ Erro ao carregar database:", error);
   }
 }
 
+// ------------------------------
+// RENDERIZA TABELA
+// ------------------------------
 function renderizarResultados(items) {
-
   const tbody = document.getElementById('resultsBody');
 
-  if (items.length === 0) {
+  if (!tbody) {
+    console.error("❌ #resultsBody não encontrado no HTML");
+    return;
+  }
 
+  if (!items || items.length === 0) {
     tbody.innerHTML = `
       <tr>
         <td colspan="8" class="no-results">
@@ -79,66 +108,51 @@ function renderizarResultados(items) {
         </td>
       </tr>
     `;
-
     return;
   }
 
   tbody.innerHTML = items.map(item => `
-
     <tr>
-
-      <td>${item.nome}</td>
-
-      <td>${item.categoria}</td>
-
-      <td>${item.subcategoria}</td>
-
-      <td>${item.calorias}</td>
-
-      <td>${item.lipidios || '-'}</td>
-
-      <td>${item.proteinas || '-'}</td>
-
-      <td>${item.carboidratos || '-'}</td>
-
+      <td>${item.nome || '-'}</td>
+      <td>${item.categoria || '-'}</td>
+      <td>${item.subcategoria || '-'}</td>
+      <td>${item.calorias ?? '-'}</td>
+      <td>${item.lipidios ?? '-'}</td>
+      <td>${item.proteinas ?? '-'}</td>
+      <td>${item.carboidratos ?? '-'}</td>
       <td>
-        <span class="
-          tipo-tag
-          ${item.tipo === 'alimento'
+        <span class="tipo-tag ${
+          item.tipo === 'alimento'
             ? 'tipo-alimento'
-            : 'tipo-exercicio'}
-        ">
-          ${item.tipo}
+            : 'tipo-exercicio'
+        }">
+          ${item.tipo || '-'}
         </span>
       </td>
-
     </tr>
-
   `).join('');
 }
 
-// Filtro de pesquisa
+// ------------------------------
+// FILTRO
+// ------------------------------
 function filtrarResultados() {
+  const searchInput = document.getElementById('searchInput');
+  const categoryFilter = document.getElementById('categoryFilter');
 
-  const termo = normalizarTexto(
-    document.getElementById('searchInput').value
-  );
+  if (!searchInput || !categoryFilter) return;
 
-  const categoriaSelecionada =
-    document.getElementById('categoryFilter').value;
+  const termo = normalizarTexto(searchInput.value);
+  const categoriaSelecionada = normalizarTexto(categoryFilter.value);
 
   const filtrados = allItems.filter(item => {
-
-    const nomeMatch =
-      normalizarTexto(item.nome).includes(termo);
+    const nomeMatch = normalizarTexto(item.nome).includes(termo);
 
     let categoriaMatch = true;
 
     if (categoriaSelecionada !== 'todos') {
-
       categoriaMatch =
-        normalizarTexto(item.categoria) ===
-        normalizarTexto(categoriaSelecionada);
+        normalizarTexto(item.categoria) === categoriaSelecionada;
     }
 
     return nomeMatch && categoriaMatch;
@@ -147,14 +161,21 @@ function filtrarResultados() {
   renderizarResultados(filtrados);
 }
 
-// Eventos
-document
-  .getElementById('searchInput')
-  .addEventListener('input', filtrarResultados);
+// ------------------------------
+// INIT (GitHub Pages SAFE)
+// ------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+  const searchInput = document.getElementById('searchInput');
+  const categoryFilter = document.getElementById('categoryFilter');
+  const tbody = document.getElementById('resultsBody');
 
-document
-  .getElementById('categoryFilter')
-  .addEventListener('change', filtrarResultados);
+  if (!searchInput || !categoryFilter || !tbody) {
+    console.error("❌ HTML elements missing (check IDs)");
+    return;
+  }
 
-// Carrega os dados
-carregarDatabase();
+  searchInput.addEventListener('input', filtrarResultados);
+  categoryFilter.addEventListener('change', filtrarResultados);
+
+  carregarDatabase();
+});
